@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# cmd.exe can jump to the wrong label in a batch file with bare LF endings.
+*.bat text eol=crlf
+
+*.jar binary
+*.keystore binary
+*.png binary
