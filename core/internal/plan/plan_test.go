@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"obxod/internal/clienthello"
 	"obxod/internal/rules"
 )
 
@@ -130,5 +131,93 @@ func TestFromRuleWithoutCutIsNoSocketWay(t *testing.T) {
 func TestFromRuleOnGarbageReturnsError(t *testing.T) {
 	if _, err := FromRule([]byte{0x00, 0x01}, rules.Rule{Cut: "name"}); err == nil {
 		t.Fatal("garbage: want error, got nil")
+	}
+}
+
+func parseName(t *testing.T, hello []byte) string {
+	t.Helper()
+	parsed, err := clienthello.Parse(hello)
+	if err != nil {
+		t.Fatalf("parse decoy: %v", err)
+	}
+	found, err := parsed.ServerName()
+	if err != nil {
+		t.Fatalf("name of decoy: %v", err)
+	}
+
+	return found.Host
+}
+
+func TestFakePrependsADoomedDecoy(t *testing.T) {
+	host := "gateway.discord.gg"
+	hello := helloWith(host)
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "auto"})
+	if err != nil {
+		t.Fatalf("fake: %v", err)
+	}
+	if len(p.Segments) != 2 {
+		t.Fatalf("segments = %d, want 2", len(p.Segments))
+	}
+	if p.Segments[0].TTL != decoyTTL {
+		t.Errorf("decoy TTL = %d, want %d", p.Segments[0].TTL, decoyTTL)
+	}
+	if parseName(t, p.Segments[0].Bytes) == host {
+		t.Error("decoy carries the real host")
+	}
+	if p.Segments[1].TTL != 0 {
+		t.Errorf("real TTL = %d, want 0", p.Segments[1].TTL)
+	}
+	if !bytes.Equal(p.Segments[1].Bytes, hello) {
+		t.Error("real segment differs from hello")
+	}
+}
+
+func TestFakeThenCutGivesDecoyAndTwoReal(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "auto", Cut: "name"})
+	if err != nil {
+		t.Fatalf("fake+cut: %v", err)
+	}
+	if len(p.Segments) != 3 {
+		t.Fatalf("segments = %d, want 3", len(p.Segments))
+	}
+
+	joined := append(append([]byte{}, p.Segments[1].Bytes...), p.Segments[2].Bytes...)
+	if !bytes.Equal(joined, hello) {
+		t.Error("the two real segments do not rejoin the hello")
+	}
+}
+
+func TestFakeUsesAGivenDecoyName(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "ya.ru"})
+	if err != nil {
+		t.Fatalf("fake: %v", err)
+	}
+	if got := parseName(t, p.Segments[0].Bytes); got != "ya.ru" {
+		t.Errorf("decoy name = %q, want ya.ru", got)
+	}
+}
+
+func TestFakeHonoursAGivenTTL(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "auto", TTL: 4})
+	if err != nil {
+		t.Fatalf("fake: %v", err)
+	}
+	if p.Segments[0].TTL != 4 {
+		t.Errorf("decoy TTL = %d, want 4", p.Segments[0].TTL)
+	}
+}
+
+func TestDecoyNameKeepsTheLength(t *testing.T) {
+	for _, host := range []string{"gateway.discord.gg", "a.co", "example.com", "vk.com"} {
+		if got := decoyName(host); len(got) != len(host) {
+			t.Errorf("decoyName(%q) = %q, len %d, want %d", host, got, len(got), len(host))
+		}
 	}
 }
