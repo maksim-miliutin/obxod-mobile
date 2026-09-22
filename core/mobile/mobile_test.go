@@ -1,6 +1,7 @@
 package mobile
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"testing"
@@ -60,5 +61,62 @@ func TestGuardTurnsPanicIntoError(t *testing.T) {
 	})
 	if !errors.Is(err, ErrPanicked) {
 		t.Errorf("err = %v, want ErrPanicked", err)
+	}
+}
+
+func TestPlanForWayCutGivesTwoSegments(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := PlanForWay(hello, "cut")
+	if err != nil {
+		t.Fatalf("PlanForWay: %v", err)
+	}
+	if p.Count() != 2 {
+		t.Fatalf("Count = %d, want 2", p.Count())
+	}
+
+	joined := append(append([]byte{}, p.Bytes(0)...), p.Bytes(1)...)
+	if !bytes.Equal(joined, hello) {
+		t.Error("joined segments differ from the hello")
+	}
+	if p.TTL(0) != 0 {
+		t.Errorf("TTL(0) = %d, want 0", p.TTL(0))
+	}
+}
+
+func TestPlanForWayUnknownWayReturnsError(t *testing.T) {
+	_, err := PlanForWay(helloWith("example.com"), "nope")
+	if !errors.Is(err, ErrUnknownWay) {
+		t.Errorf("err = %v, want ErrUnknownWay", err)
+	}
+}
+
+func TestPlanIndexOutOfRangeIsSafe(t *testing.T) {
+	p, err := PlanForWay(helloWith("example.com"), "cut")
+	if err != nil {
+		t.Fatalf("PlanForWay: %v", err)
+	}
+	if p.Bytes(-1) != nil || p.Bytes(99) != nil {
+		t.Error("out-of-range Bytes should be nil")
+	}
+	if p.TTL(99) != 0 {
+		t.Error("out-of-range TTL should be 0")
+	}
+}
+
+func TestPlanKeepsItsOwnBytes(t *testing.T) {
+	hello := helloWith("example.com")
+
+	p, err := PlanForWay(hello, "cut")
+	if err != nil {
+		t.Fatalf("PlanForWay: %v", err)
+	}
+
+	before := append([]byte{}, p.Bytes(0)...)
+	for i := range hello {
+		hello[i] = 0
+	}
+	if !bytes.Equal(p.Bytes(0), before) {
+		t.Error("plan bytes changed after the input was trashed")
 	}
 }

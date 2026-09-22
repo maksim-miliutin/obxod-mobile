@@ -4,9 +4,13 @@ import (
 	"errors"
 
 	"obxod/internal/clienthello"
+	"obxod/internal/plan"
 )
 
-var ErrPanicked = errors.New("mobile: recovered from a panic in core")
+var (
+	ErrPanicked   = errors.New("mobile: recovered from a panic in core")
+	ErrUnknownWay = errors.New("mobile: unknown way")
+)
 
 // A panic crossing the gomobile boundary exits the app, so guard turns it into an error.
 func guard[T any](call func() (T, error)) (result T, err error) {
@@ -34,4 +38,54 @@ func ServerName(hello []byte) (string, error) {
 
 		return found.Host, nil
 	})
+}
+
+func PlanForWay(hello []byte, way string) (*Plan, error) {
+	return guard(func() (*Plan, error) {
+		switch way {
+		case "cut":
+			computed, err := plan.Cut(hello)
+			if err != nil {
+				return nil, err
+			}
+
+			return newPlan(computed.Segments), nil
+		default:
+			return nil, ErrUnknownWay
+		}
+	})
+}
+
+type Plan struct {
+	segments []plan.Segment
+}
+
+// Byte slices cross gomobile by reference; the copy keeps a reused caller buffer from rewriting the plan.
+func newPlan(segments []plan.Segment) *Plan {
+	own := make([]plan.Segment, len(segments))
+	for i, s := range segments {
+		own[i] = plan.Segment{Bytes: append([]byte(nil), s.Bytes...), TTL: s.TTL}
+	}
+
+	return &Plan{segments: own}
+}
+
+func (p *Plan) Count() int {
+	return len(p.segments)
+}
+
+func (p *Plan) Bytes(index int) []byte {
+	if index < 0 || index >= len(p.segments) {
+		return nil
+	}
+
+	return p.segments[index].Bytes
+}
+
+func (p *Plan) TTL(index int) int {
+	if index < 0 || index >= len(p.segments) {
+		return 0
+	}
+
+	return p.segments[index].TTL
 }
