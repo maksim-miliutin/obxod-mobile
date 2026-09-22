@@ -2,10 +2,14 @@ package plan
 
 import (
 	"errors"
+	"strings"
 
 	"obxod/internal/clienthello"
 	"obxod/internal/rules"
 )
+
+// The decoy must die within a few hops, before the server but past the inspector.
+const decoyTTL = 8
 
 var (
 	ErrNoSocketWay = errors.New("plan: the rule names no way a socket can apply")
@@ -26,7 +30,7 @@ func Cut(hello []byte) (Plan, error) {
 }
 
 func FromRule(hello []byte, rule rules.Rule) (Plan, error) {
-	if rule.Cut == "" {
+	if rule.Decoy == "" && rule.Cut == "" {
 		return Plan{}, ErrNoSocketWay
 	}
 
@@ -40,15 +44,61 @@ func FromRule(hello []byte, rule rules.Rule) (Plan, error) {
 		return Plan{}, err
 	}
 
-	at, err := splitPoint(found, rule.Cut, len(hello))
+	var segments []Segment
+
+	if rule.Decoy != "" {
+		doomed, err := decoy(parsed, found.Host, rule.Decoy)
+		if err != nil {
+			return Plan{}, err
+		}
+
+		ttl := int(rule.TTL)
+		if ttl == 0 {
+			ttl = decoyTTL
+		}
+
+		segments = append(segments, Segment{Bytes: doomed, TTL: ttl})
+	}
+
+	real, err := realSegments(hello, found, rule.Cut)
 	if err != nil {
 		return Plan{}, err
 	}
 
-	return Plan{Segments: []Segment{
-		{Bytes: hello[:at]},
-		{Bytes: hello[at:]},
-	}}, nil
+	return Plan{Segments: append(segments, real...)}, nil
+}
+
+func decoy(parsed clienthello.Hello, host, spec string) ([]byte, error) {
+	name := spec
+	if spec == "auto" {
+		name = decoyName(host)
+	}
+
+	return parsed.Renamed(name)
+}
+
+// A harmless name exactly as long as the real one, so the lengths inside the hello stay true.
+func decoyName(host string) string {
+	const base = "google.com"
+
+	if len(host) < len(base)+2 {
+		return strings.Repeat("a", len(host)-4) + ".com"
+	}
+
+	return strings.Repeat("x", len(host)-len(base)-1) + "." + base
+}
+
+func realSegments(hello []byte, sni clienthello.ServerName, cut string) ([]Segment, error) {
+	if cut == "" {
+		return []Segment{{Bytes: hello}}, nil
+	}
+
+	at, err := splitPoint(sni, cut, len(hello))
+	if err != nil {
+		return nil, err
+	}
+
+	return []Segment{{Bytes: hello[:at]}, {Bytes: hello[at:]}}, nil
 }
 
 func splitPoint(sni clienthello.ServerName, mode string, size int) (int, error) {
