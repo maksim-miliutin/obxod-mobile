@@ -52,3 +52,26 @@ jobs:
 
       - name: build for android
         run: GOOS=android GOARCH=arm64 go build ./...
+
+  app:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # ci, not install: exactly what the lock holds, and a failure if it drifted from package.json.
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build

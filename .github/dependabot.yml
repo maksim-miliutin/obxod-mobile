@@ -10,3 +10,16 @@ updates:
     directory: /core
     schedule:
       interval: monthly
+
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: monthly
+    # React Native moves only whole, together with its native files: a lone bump
+    # of any of these breaks the build or the app at start.
+    ignore:
+      - dependency-name: react
+      - dependency-name: react-native
+      - dependency-name: react-test-renderer
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-community/cli*"
