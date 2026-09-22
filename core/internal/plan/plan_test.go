@@ -3,7 +3,10 @@ package plan
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"testing"
+
+	"obxod/internal/rules"
 )
 
 func helloWith(host string) []byte {
@@ -17,6 +20,12 @@ func helloWith(host string) []byte {
 	extension := binary.BigEndian.AppendUint16(nil, 0x0000)
 	extension = binary.BigEndian.AppendUint16(extension, uint16(len(list)))
 	extension = append(extension, list...)
+
+	padding := binary.BigEndian.AppendUint16(nil, 0x0015)
+	padding = binary.BigEndian.AppendUint16(padding, 4)
+	padding = append(padding, 0, 0, 0, 0)
+
+	extension = append(extension, padding...)
 
 	block := binary.BigEndian.AppendUint16(nil, uint16(len(extension)))
 	block = append(block, extension...)
@@ -37,28 +46,20 @@ func helloWith(host string) []byte {
 	return append(record, handshake...)
 }
 
-func hostOffset(hello []byte, host string) int {
+func hostStart(hello []byte, host string) int {
 	return bytes.Index(hello, []byte(host))
 }
 
-func TestCutSplitsInTwoAndKeepsBytes(t *testing.T) {
-	hello := helloWith("gateway.discord.gg")
-
-	p, err := Cut(hello)
-	if err != nil {
-		t.Fatalf("Cut: %v", err)
-	}
+func splitAt(t *testing.T, p Plan) int {
+	t.Helper()
 	if len(p.Segments) != 2 {
 		t.Fatalf("segments = %d, want 2", len(p.Segments))
 	}
 
-	joined := append(append([]byte{}, p.Segments[0].Bytes...), p.Segments[1].Bytes...)
-	if !bytes.Equal(joined, hello) {
-		t.Error("joined segments differ from the original hello")
-	}
+	return len(p.Segments[0].Bytes)
 }
 
-func TestCutBreaksInsideTheHost(t *testing.T) {
+func TestCutStillSplitsInsideTheHost(t *testing.T) {
 	host := "gateway.discord.gg"
 	hello := helloWith(host)
 
@@ -67,15 +68,67 @@ func TestCutBreaksInsideTheHost(t *testing.T) {
 		t.Fatalf("Cut: %v", err)
 	}
 
-	at := len(p.Segments[0].Bytes)
-	start := hostOffset(hello, host)
+	at := splitAt(t, p)
+	start := hostStart(hello, host)
 	if at <= start || at >= start+len(host) {
-		t.Errorf("split at %d, want strictly inside host [%d, %d)", at, start, start+len(host))
+		t.Errorf("split at %d, want inside host [%d, %d)", at, start, start+len(host))
 	}
 }
 
-func TestCutOnGarbageReturnsError(t *testing.T) {
-	if _, err := Cut([]byte{0x00, 0x01, 0x02}); err == nil {
-		t.Fatal("Cut on garbage: want error, got nil")
+func TestFromRuleCutAfterSplitsPastTheHost(t *testing.T) {
+	host := "gateway.discord.gg"
+	hello := helloWith(host)
+
+	p, err := FromRule(hello, rules.Rule{Cut: "after"})
+	if err != nil {
+		t.Fatalf("FromRule: %v", err)
+	}
+
+	at := splitAt(t, p)
+	if at != hostStart(hello, host)+len(host) {
+		t.Errorf("after: split at %d, want %d", at, hostStart(hello, host)+len(host))
+	}
+}
+
+func TestFromRuleCutStartSplitsNearTheStart(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Cut: "start"})
+	if err != nil {
+		t.Fatalf("FromRule: %v", err)
+	}
+
+	if at := splitAt(t, p); at != 2 {
+		t.Errorf("start: split at %d, want 2", at)
+	}
+}
+
+func TestFromRuleKeepsAllBytes(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	for _, mode := range []string{"name", "after", "start"} {
+		p, err := FromRule(hello, rules.Rule{Cut: mode})
+		if err != nil {
+			t.Fatalf("FromRule %q: %v", mode, err)
+		}
+
+		joined := append(append([]byte{}, p.Segments[0].Bytes...), p.Segments[1].Bytes...)
+		if !bytes.Equal(joined, hello) {
+			t.Errorf("%q: joined segments differ from the hello", mode)
+		}
+	}
+}
+
+func TestFromRuleWithoutCutIsNoSocketWay(t *testing.T) {
+	hello := helloWith("example.com")
+
+	if _, err := FromRule(hello, rules.Rule{}); !errors.Is(err, ErrNoSocketWay) {
+		t.Errorf("empty rule: err = %v, want ErrNoSocketWay", err)
+	}
+}
+
+func TestFromRuleOnGarbageReturnsError(t *testing.T) {
+	if _, err := FromRule([]byte{0x00, 0x01}, rules.Rule{Cut: "name"}); err == nil {
+		t.Fatal("garbage: want error, got nil")
 	}
 }
