@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Checks only: the default token can write to the repository, and nothing here should.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: core
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # working-directory moves run steps only; setup steps still read paths from the root.
+      # Hashing go.mod, not go.sum: with no third-party modules there is no go.sum to key on.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.mod
+
+      - name: format
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./...
+
+      - name: race
+        run: go test -race ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: vet for android
+        run: GOOS=android GOARCH=arm64 go vet ./...
+
+      - name: build for android
+        run: GOOS=android GOARCH=arm64 go build ./...
