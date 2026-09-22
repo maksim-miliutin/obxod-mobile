@@ -8,23 +8,30 @@ import (
 
 var ErrPanicked = errors.New("mobile: recovered from a panic in core")
 
-func ServerName(hello []byte) (name string, err error) {
-	// A panic crossing the gomobile boundary exits the app, so it becomes an error here.
+// A panic crossing the gomobile boundary exits the app, so guard turns it into an error.
+func guard[T any](call func() (T, error)) (result T, err error) {
 	defer func() {
 		if recover() != nil {
-			name, err = "", ErrPanicked
+			var zero T
+			result, err = zero, ErrPanicked
 		}
 	}()
 
-	parsed, err := clienthello.Parse(hello)
-	if err != nil {
-		return "", err
-	}
+	return call()
+}
 
-	found, err := parsed.ServerName()
-	if err != nil {
-		return "", err
-	}
+func ServerName(hello []byte) (string, error) {
+	return guard(func() (string, error) {
+		parsed, err := clienthello.Parse(hello)
+		if err != nil {
+			return "", err
+		}
 
-	return found.Host, nil
+		found, err := parsed.ServerName()
+		if err != nil {
+			return "", err
+		}
+
+		return found.Host, nil
+	})
 }
