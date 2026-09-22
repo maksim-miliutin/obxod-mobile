@@ -2,6 +2,7 @@ package mobile
 
 import (
 	"encoding/binary"
+	"errors"
 	"testing"
 )
 
@@ -50,5 +51,14 @@ func TestServerNameOnGarbageReturnsError(t *testing.T) {
 	_, err := ServerName([]byte{0x00, 0x01, 0x02})
 	if err == nil {
 		t.Fatal("ServerName on garbage: want error, got nil")
+	}
+}
+
+func TestGuardTurnsPanicIntoError(t *testing.T) {
+	_, err := guard(func() (int, error) {
+		panic("boom")
+	})
+	if !errors.Is(err, ErrPanicked) {
+		t.Errorf("err = %v, want ErrPanicked", err)
 	}
 }
