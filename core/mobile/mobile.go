@@ -5,11 +5,13 @@ import (
 
 	"obxod/internal/clienthello"
 	"obxod/internal/plan"
+	"obxod/internal/rules"
 )
 
 var (
 	ErrPanicked   = errors.New("mobile: recovered from a panic in core")
 	ErrUnknownWay = errors.New("mobile: unknown way")
+	ErrNoRule     = errors.New("mobile: no rule for the host")
 )
 
 // A panic crossing the gomobile boundary exits the app, so guard turns it into an error.
@@ -53,6 +55,27 @@ func PlanForWay(hello []byte, way string) (*Plan, error) {
 		default:
 			return nil, ErrUnknownWay
 		}
+	})
+}
+
+func PlanForHost(hello []byte, host string, rulesText string) (*Plan, error) {
+	return guard(func() (*Plan, error) {
+		set, err := rules.Several(rulesText)
+		if err != nil {
+			return nil, err
+		}
+
+		rule, ok := set.For(host)
+		if !ok {
+			return nil, ErrNoRule
+		}
+
+		computed, err := plan.FromRule(hello, rule)
+		if err != nil {
+			return nil, err
+		}
+
+		return newPlan(computed.Segments), nil
 	})
 }
 
