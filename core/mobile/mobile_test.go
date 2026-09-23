@@ -120,3 +120,44 @@ func TestPlanKeepsItsOwnBytes(t *testing.T) {
 		t.Error("plan bytes changed after the input was trashed")
 	}
 }
+
+func TestPlanForHostAppliesTheRule(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	p, err := PlanForHost(hello, "discord.com", "discord.com=cut:name")
+	if err != nil {
+		t.Fatalf("PlanForHost: %v", err)
+	}
+	if p.Count() != 2 {
+		t.Errorf("segments = %d, want 2 (a cut)", p.Count())
+	}
+}
+
+func TestPlanForHostFakeThenCut(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	p, err := PlanForHost(hello, "discord.com", "discord.com=decoy:auto,cut:name")
+	if err != nil {
+		t.Fatalf("PlanForHost: %v", err)
+	}
+	if p.Count() != 3 {
+		t.Errorf("segments = %d, want 3 (decoy + two)", p.Count())
+	}
+}
+
+func TestPlanForHostWithNoRuleSaysSo(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	_, err := PlanForHost(hello, "discord.com", "other.com=cut:name")
+	if !errors.Is(err, ErrNoRule) {
+		t.Errorf("err = %v, want ErrNoRule", err)
+	}
+}
+
+func TestPlanForHostReportsBadRules(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	if _, err := PlanForHost(hello, "discord.com", "discord.com=cut"); err == nil {
+		t.Fatal("bad rule text: want error, got nil")
+	}
+}
