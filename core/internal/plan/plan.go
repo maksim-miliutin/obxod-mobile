@@ -60,7 +60,7 @@ func FromRule(hello []byte, rule rules.Rule) (Plan, error) {
 		segments = append(segments, Segment{Bytes: doomed, TTL: ttl})
 	}
 
-	real, err := realSegments(hello, found, rule.Cut)
+	real, err := realSegments(hello, found, rule.Cut, rule.Disorder)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -88,7 +88,7 @@ func decoyName(host string) string {
 	return strings.Repeat("x", len(host)-len(base)-1) + "." + base
 }
 
-func realSegments(hello []byte, sni clienthello.ServerName, cut string) ([]Segment, error) {
+func realSegments(hello []byte, sni clienthello.ServerName, cut string, disorder bool) ([]Segment, error) {
 	if cut == "" {
 		return []Segment{{Bytes: hello}}, nil
 	}
@@ -98,7 +98,14 @@ func realSegments(hello []byte, sni clienthello.ServerName, cut string) ([]Segme
 		return nil, err
 	}
 
-	return []Segment{{Bytes: hello[:at]}, {Bytes: hello[at:]}}, nil
+	first := Segment{Bytes: hello[:at]}
+	if disorder {
+		// A doomed first part: the inspector sees it, the kernel resends it once the next
+		// segment's normal TTL has restored the default.
+		first.TTL = 1
+	}
+
+	return []Segment{first, {Bytes: hello[at:]}}, nil
 }
 
 func splitPoint(sni clienthello.ServerName, mode string, size int) (int, error) {
