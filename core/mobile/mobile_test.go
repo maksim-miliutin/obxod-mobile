@@ -196,3 +196,26 @@ func TestPlanForStrategyRejectsGarbage(t *testing.T) {
 		t.Fatal("bad strategy: want error, got nil")
 	}
 }
+
+func TestStrategiesAreOffered(t *testing.T) {
+	ways := Strategies()
+	if ways.Count() == 0 {
+		t.Fatal("no strategies offered")
+	}
+	if ways.At(0) == "" {
+		t.Error("first strategy is empty")
+	}
+	if ways.At(-1) != "" || ways.At(9999) != "" {
+		t.Error("out-of-range At should be empty")
+	}
+}
+
+func TestEveryOfferedStrategyPlans(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+	ways := Strategies()
+	for i := 0; i < ways.Count(); i++ {
+		if _, err := PlanForStrategy(hello, ways.At(i)); err != nil {
+			t.Errorf("offered strategy %q does not plan: %v", ways.At(i), err)
+		}
+	}
+}
