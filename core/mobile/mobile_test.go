@@ -161,3 +161,38 @@ func TestPlanForHostReportsBadRules(t *testing.T) {
 		t.Fatal("bad rule text: want error, got nil")
 	}
 }
+
+func TestPlanForStrategyCuts(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	p, err := PlanForStrategy(hello, "cut:name")
+	if err != nil {
+		t.Fatalf("PlanForStrategy: %v", err)
+	}
+	if p.Count() != 2 {
+		t.Errorf("segments = %d, want 2", p.Count())
+	}
+}
+
+func TestPlanForStrategyFakeThenCut(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	p, err := PlanForStrategy(hello, "decoy:auto,ttl:4,cut:name")
+	if err != nil {
+		t.Fatalf("PlanForStrategy: %v", err)
+	}
+	if p.Count() != 3 {
+		t.Errorf("segments = %d, want 3", p.Count())
+	}
+	if p.TTL(0) != 4 {
+		t.Errorf("decoy TTL = %d, want 4", p.TTL(0))
+	}
+}
+
+func TestPlanForStrategyRejectsGarbage(t *testing.T) {
+	hello := helloWith("discord.com")
+
+	if _, err := PlanForStrategy(hello, "cut"); err == nil {
+		t.Fatal("bad strategy: want error, got nil")
+	}
+}

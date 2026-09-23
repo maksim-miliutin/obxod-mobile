@@ -79,6 +79,23 @@ func PlanForHost(hello []byte, host string, rulesText string) (*Plan, error) {
 	})
 }
 
+func PlanForStrategy(hello []byte, strategy string) (*Plan, error) {
+	return guard(func() (*Plan, error) {
+		// rules.Parse wants host=ways; the host is unused when planning a bare strategy.
+		rule, err := rules.Parse("x=" + strategy)
+		if err != nil {
+			return nil, err
+		}
+
+		computed, err := plan.FromRule(hello, rule)
+		if err != nil {
+			return nil, err
+		}
+
+		return newPlan(computed.Segments), nil
+	})
+}
+
 type Plan struct {
 	segments []plan.Segment
 }
