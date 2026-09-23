@@ -323,3 +323,20 @@ func TestNoRepeatsIsOneDecoy(t *testing.T) {
 		t.Errorf("segments = %d, want 2", len(p.Segments))
 	}
 }
+
+func FuzzFromRule(f *testing.F) {
+	f.Add("cut:name", helloWith("example.com"))
+	f.Add("decoy:auto,ttl:4,cut:name", helloWith("gateway.discord.gg"))
+	f.Add("decoy:auto,repeats:3", helloWith("a.co"))
+	f.Add("badseq:100000", []byte{0x16, 0x03, 0x01})
+	f.Add("", []byte{})
+
+	f.Fuzz(func(t *testing.T, ways string, hello []byte) {
+		rule, err := rules.Parse("x=" + ways)
+		if err != nil {
+			return
+		}
+
+		FromRule(hello, rule)
+	})
+}
