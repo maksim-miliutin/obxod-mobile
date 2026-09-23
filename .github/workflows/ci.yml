@@ -26,11 +26,10 @@ jobs:
       - uses: actions/checkout@v7
 
       # working-directory moves run steps only; setup steps still read paths from the root.
-      # Hashing go.mod, not go.sum: with no third-party modules there is no go.sum to key on.
       - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
-          cache-dependency-path: core/go.mod
+          cache-dependency-path: core/go.sum
 
       - name: format
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
