@@ -255,3 +255,71 @@ func TestCutWithoutDisorderIsNormalTTL(t *testing.T) {
 		t.Errorf("first TTL = %d, want 0 (no disorder)", p.Segments[0].TTL)
 	}
 }
+
+func TestRawWaysAreRejected(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	raw := []rules.Rule{
+		{BadSeq: 100000},
+		{BadSum: true},
+		{Overlap: 1},
+		{Signed: true},
+		{HostFake: "mail.ru"},
+		{Recorded: true},
+		{Stale: 1 << 30},
+		{BadAck: -66000},
+	}
+	for _, rule := range raw {
+		if _, err := FromRule(hello, rule); !errors.Is(err, ErrNotOnSocket) {
+			t.Errorf("%+v: err = %v, want ErrNotOnSocket", rule, err)
+		}
+	}
+}
+
+func TestRawWayIsRejectedEvenBesideACut(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	if _, err := FromRule(hello, rules.Rule{Cut: "name", BadSeq: 100000}); !errors.Is(err, ErrNotOnSocket) {
+		t.Errorf("cut+badseq: err = %v, want ErrNotOnSocket", err)
+	}
+}
+
+func TestSocketRuleStillPlans(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	if _, err := FromRule(hello, rules.Rule{Decoy: "auto", TTL: 4, Cut: "name"}); err != nil {
+		t.Errorf("socket rule: %v", err)
+	}
+}
+
+func TestRepeatsSendTheDecoyManyTimes(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "auto", Repeats: 3})
+	if err != nil {
+		t.Fatalf("repeats: %v", err)
+	}
+	if n := len(p.Segments); n != 4 {
+		t.Fatalf("segments = %d, want 4 (three decoys + one real)", n)
+	}
+	for i := 0; i < 3; i++ {
+		if p.Segments[i].TTL != decoyTTL {
+			t.Errorf("decoy %d TTL = %d, want %d", i, p.Segments[i].TTL, decoyTTL)
+		}
+	}
+	if p.Segments[3].TTL != 0 {
+		t.Errorf("real TTL = %d, want 0", p.Segments[3].TTL)
+	}
+}
+
+func TestNoRepeatsIsOneDecoy(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Decoy: "auto"})
+	if err != nil {
+		t.Fatalf("decoy: %v", err)
+	}
+	if len(p.Segments) != 2 {
+		t.Errorf("segments = %d, want 2", len(p.Segments))
+	}
+}
