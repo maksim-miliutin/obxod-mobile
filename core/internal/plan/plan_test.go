@@ -255,3 +255,39 @@ func TestCutWithoutDisorderIsNormalTTL(t *testing.T) {
 		t.Errorf("first TTL = %d, want 0 (no disorder)", p.Segments[0].TTL)
 	}
 }
+
+func TestRawWaysAreRejected(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	raw := []rules.Rule{
+		{BadSeq: 100000},
+		{BadSum: true},
+		{Overlap: 1},
+		{Signed: true},
+		{HostFake: "mail.ru"},
+		{Recorded: true},
+		{Stale: 1 << 30},
+		{BadAck: -66000},
+	}
+	for _, rule := range raw {
+		if _, err := FromRule(hello, rule); !errors.Is(err, ErrNotOnSocket) {
+			t.Errorf("%+v: err = %v, want ErrNotOnSocket", rule, err)
+		}
+	}
+}
+
+func TestRawWayIsRejectedEvenBesideACut(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	if _, err := FromRule(hello, rules.Rule{Cut: "name", BadSeq: 100000}); !errors.Is(err, ErrNotOnSocket) {
+		t.Errorf("cut+badseq: err = %v, want ErrNotOnSocket", err)
+	}
+}
+
+func TestSocketRuleStillPlans(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	if _, err := FromRule(hello, rules.Rule{Decoy: "auto", TTL: 4, Cut: "name"}); err != nil {
+		t.Errorf("socket rule: %v", err)
+	}
+}

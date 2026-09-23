@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"obxod/internal/clienthello"
@@ -13,6 +14,7 @@ const decoyTTL = 8
 
 var (
 	ErrNoSocketWay = errors.New("plan: the rule names no way a socket can apply")
+	ErrNotOnSocket = errors.New("plan: the rule needs a way the socket path cannot do")
 	ErrBadCut      = errors.New("plan: cut wants name, after or start")
 )
 
@@ -30,6 +32,10 @@ func Cut(hello []byte) (Plan, error) {
 }
 
 func FromRule(hello []byte, rule rules.Rule) (Plan, error) {
+	if way := notOnSocket(rule); way != "" {
+		return Plan{}, fmt.Errorf("%w: %s", ErrNotOnSocket, way)
+	}
+
 	if rule.Decoy == "" && rule.Cut == "" {
 		return Plan{}, ErrNoSocketWay
 	}
@@ -106,6 +112,31 @@ func realSegments(hello []byte, sni clienthello.ServerName, cut string, disorder
 	}
 
 	return []Segment{first, {Bytes: hello[at:]}}, nil
+}
+
+func notOnSocket(rule rules.Rule) string {
+	switch {
+	case rule.BadSeq != 0:
+		return "badseq"
+	case rule.BadAck != 0:
+		return "badack"
+	case rule.BadSum:
+		return "badsum"
+	case rule.Signed:
+		return "md5sig"
+	case rule.Recorded:
+		return "fake"
+	case rule.Overlap != 0:
+		return "overlap"
+	case rule.Stale != 0:
+		return "ts"
+	case rule.HostFake != "":
+		return "hostfake"
+	case rule.FakeUDP != 0:
+		return "fakeudp"
+	}
+
+	return ""
 }
 
 func splitPoint(sni clienthello.ServerName, mode string, size int) (int, error) {
