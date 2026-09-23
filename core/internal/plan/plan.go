@@ -63,7 +63,13 @@ func FromRule(hello []byte, rule rules.Rule) (Plan, error) {
 			ttl = decoyTTL
 		}
 
-		segments = append(segments, Segment{Bytes: doomed, TTL: ttl})
+		times := rule.Repeats
+		if times == 0 {
+			times = 1
+		}
+		for i := 0; i < times; i++ {
+			segments = append(segments, Segment{Bytes: doomed, TTL: ttl})
+		}
 	}
 
 	real, err := realSegments(hello, found, rule.Cut, rule.Disorder)
