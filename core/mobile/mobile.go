@@ -6,6 +6,7 @@ import (
 	"obxod/internal/clienthello"
 	"obxod/internal/plan"
 	"obxod/internal/rules"
+	"obxod/internal/sweep"
 )
 
 var (
@@ -128,4 +129,24 @@ func (p *Plan) TTL(index int) int {
 	}
 
 	return p.segments[index].TTL
+}
+
+func Strategies() *Ways {
+	return &Ways{names: sweep.Strategies()}
+}
+
+type Ways struct {
+	names []string
+}
+
+func (w *Ways) Count() int {
+	return len(w.names)
+}
+
+func (w *Ways) At(index int) string {
+	if index < 0 || index >= len(w.names) {
+		return ""
+	}
+
+	return w.names[index]
 }
