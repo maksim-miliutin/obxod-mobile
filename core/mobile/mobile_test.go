@@ -64,37 +64,10 @@ func TestGuardTurnsPanicIntoError(t *testing.T) {
 	}
 }
 
-func TestPlanForWayCutGivesTwoSegments(t *testing.T) {
-	hello := helloWith("gateway.discord.gg")
-
-	p, err := PlanForWay(hello, "cut")
-	if err != nil {
-		t.Fatalf("PlanForWay: %v", err)
-	}
-	if p.Count() != 2 {
-		t.Fatalf("Count = %d, want 2", p.Count())
-	}
-
-	joined := append(append([]byte{}, p.Bytes(0)...), p.Bytes(1)...)
-	if !bytes.Equal(joined, hello) {
-		t.Error("joined segments differ from the hello")
-	}
-	if p.TTL(0) != 0 {
-		t.Errorf("TTL(0) = %d, want 0", p.TTL(0))
-	}
-}
-
-func TestPlanForWayUnknownWayReturnsError(t *testing.T) {
-	_, err := PlanForWay(helloWith("example.com"), "nope")
-	if !errors.Is(err, ErrUnknownWay) {
-		t.Errorf("err = %v, want ErrUnknownWay", err)
-	}
-}
-
 func TestPlanIndexOutOfRangeIsSafe(t *testing.T) {
-	p, err := PlanForWay(helloWith("example.com"), "cut")
+	p, err := PlanForStrategy(helloWith("example.com"), "cut:name")
 	if err != nil {
-		t.Fatalf("PlanForWay: %v", err)
+		t.Fatalf("PlanForStrategy: %v", err)
 	}
 	if p.Bytes(-1) != nil || p.Bytes(99) != nil {
 		t.Error("out-of-range Bytes should be nil")
@@ -107,9 +80,9 @@ func TestPlanIndexOutOfRangeIsSafe(t *testing.T) {
 func TestPlanKeepsItsOwnBytes(t *testing.T) {
 	hello := helloWith("example.com")
 
-	p, err := PlanForWay(hello, "cut")
+	p, err := PlanForStrategy(hello, "cut:name")
 	if err != nil {
-		t.Fatalf("PlanForWay: %v", err)
+		t.Fatalf("PlanForStrategy: %v", err)
 	}
 
 	before := append([]byte{}, p.Bytes(0)...)

@@ -10,9 +10,8 @@ import (
 )
 
 var (
-	ErrPanicked   = errors.New("mobile: recovered from a panic in core")
-	ErrUnknownWay = errors.New("mobile: unknown way")
-	ErrNoRule     = errors.New("mobile: no rule for the host")
+	ErrPanicked = errors.New("mobile: recovered from a panic in core")
+	ErrNoRule   = errors.New("mobile: no rule for the host")
 )
 
 // A panic crossing the gomobile boundary exits the app, so guard turns it into an error.
@@ -40,22 +39,6 @@ func ServerName(hello []byte) (string, error) {
 		}
 
 		return found.Host, nil
-	})
-}
-
-func PlanForWay(hello []byte, way string) (*Plan, error) {
-	return guard(func() (*Plan, error) {
-		switch way {
-		case "cut":
-			computed, err := plan.Cut(hello)
-			if err != nil {
-				return nil, err
-			}
-
-			return newPlan(computed.Segments), nil
-		default:
-			return nil, ErrUnknownWay
-		}
 	})
 }
 
