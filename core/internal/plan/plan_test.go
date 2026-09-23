@@ -221,3 +221,37 @@ func TestDecoyNameKeepsTheLength(t *testing.T) {
 		}
 	}
 }
+
+func TestDisorderDoomsTheFirstSegment(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Cut: "name", Disorder: true})
+	if err != nil {
+		t.Fatalf("disorder: %v", err)
+	}
+	if len(p.Segments) != 2 {
+		t.Fatalf("segments = %d, want 2", len(p.Segments))
+	}
+	if p.Segments[0].TTL != 1 {
+		t.Errorf("first TTL = %d, want 1", p.Segments[0].TTL)
+	}
+	if p.Segments[1].TTL != 0 {
+		t.Errorf("second TTL = %d, want 0", p.Segments[1].TTL)
+	}
+	joined := append(append([]byte{}, p.Segments[0].Bytes...), p.Segments[1].Bytes...)
+	if !bytes.Equal(joined, hello) {
+		t.Error("disorder changed the bytes")
+	}
+}
+
+func TestCutWithoutDisorderIsNormalTTL(t *testing.T) {
+	hello := helloWith("gateway.discord.gg")
+
+	p, err := FromRule(hello, rules.Rule{Cut: "name"})
+	if err != nil {
+		t.Fatalf("cut: %v", err)
+	}
+	if p.Segments[0].TTL != 0 {
+		t.Errorf("first TTL = %d, want 0 (no disorder)", p.Segments[0].TTL)
+	}
+}
