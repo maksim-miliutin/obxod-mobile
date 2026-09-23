@@ -150,3 +150,26 @@ func (w *Ways) At(index int) string {
 
 	return w.names[index]
 }
+
+type Sweep struct {
+	best  string
+	bytes int
+}
+
+func NewSweep() *Sweep {
+	return &Sweep{}
+}
+
+func (s *Sweep) Record(strategy string, bytes int) {
+	if bytes > s.bytes {
+		s.best, s.bytes = strategy, bytes
+	}
+}
+
+func (s *Sweep) Best() string {
+	return s.best
+}
+
+func (s *Sweep) Found() bool {
+	return s.bytes > 0
+}

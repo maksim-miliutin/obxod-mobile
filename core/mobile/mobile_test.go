@@ -219,3 +219,33 @@ func TestEveryOfferedStrategyPlans(t *testing.T) {
 		}
 	}
 }
+
+func TestSweepStartsEmpty(t *testing.T) {
+	s := NewSweep()
+	if s.Found() || s.Best() != "" {
+		t.Error("a fresh sweep should have no winner")
+	}
+}
+
+func TestSweepKeepsTheStrategyWithMostBytes(t *testing.T) {
+	s := NewSweep()
+	s.Record("cut:name", 40)
+	s.Record("decoy:auto,ttl:4", 900)
+	s.Record("cut:start", 120)
+
+	if !s.Found() {
+		t.Fatal("Found should be true after a positive result")
+	}
+	if s.Best() != "decoy:auto,ttl:4" {
+		t.Errorf("Best = %q, want decoy:auto,ttl:4", s.Best())
+	}
+}
+
+func TestSweepIgnoresEmptyResults(t *testing.T) {
+	s := NewSweep()
+	s.Record("cut:name", 0)
+
+	if s.Found() {
+		t.Error("a zero-byte result is not a win")
+	}
+}
