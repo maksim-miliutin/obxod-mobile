@@ -111,6 +111,9 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // The Go core, built by core/bind.ps1 into libs/obxod.aar.
+    implementation(files("libs/obxod.aar"))
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
