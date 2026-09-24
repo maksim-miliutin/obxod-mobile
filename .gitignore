@@ -27,3 +27,4 @@ local.properties
 *.pcap
 *.pcapng
 *.ps1
+!core/bind.ps1
